@@ -132,6 +132,14 @@ class ManagerAssignment(BaseModel):
     manager_id: Optional[str] = None
 
 
+class ReportingManagerChoice(BaseModel):
+    """User row for a manager in `MANAGER_DIRECTORY` who exists in the database."""
+
+    user_id: str
+    email: str
+    name: str
+
+
 class TeamAssignment(BaseModel):
     team: Optional[TeamCode] = None
 

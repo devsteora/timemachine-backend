@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from app.api.dependencies import get_current_user, get_current_admin, get_db
 from app.models.activity import ActivityLog
 from app.models.user import User
+from app.core.manager_directory import MANAGER_DIRECTORY, is_email_in_directory
 from app.schemas.schemas import (
     ActivityTimelineItem,
     ActivityTimelineResponse,
@@ -19,6 +20,7 @@ from app.schemas.schemas import (
     CsvUserImportResult,
     ManagerAssignment,
     PresenceState,
+    ReportingManagerChoice,
     TeamAssignment,
     TeamPresenceMember,
     TeamPresenceResponse,
@@ -364,6 +366,44 @@ async def import_users_csv(
         ) from e
 
 
+@admin_router.get(
+    "/reporting-managers",
+    response_model=List[ReportingManagerChoice],
+)
+def list_reporting_manager_choices(
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_admin),
+) -> Any:
+    """
+    Managers admins may assign — only users whose email appears in
+    `MANAGER_DIRECTORY`, in that order. Unregistered directory emails are omitted.
+    """
+    dir_emails_lower = {m["email"].strip().lower() for m in MANAGER_DIRECTORY}
+    if not dir_emails_lower:
+        return []
+    users = (
+        db.query(User)
+        .filter(func.lower(User.email).in_(dir_emails_lower))
+        .all()
+    )
+    by_lower = {u.email.strip().lower(): u for u in users}
+    out: list[ReportingManagerChoice] = []
+    for m in MANAGER_DIRECTORY:
+        key = m["email"].strip().lower()
+        u = by_lower.get(key)
+        if u is None:
+            continue
+        display_name = (u.name or "").strip() or m["name"]
+        out.append(
+            ReportingManagerChoice(
+                user_id=u.id,
+                email=u.email,
+                name=display_name,
+            )
+        )
+    return out
+
+
 @admin_router.get("/users", response_model=List[AdminUserRow])
 def list_users_for_admin(
     db: Session = Depends(get_db),
@@ -422,6 +462,11 @@ def set_user_reporting_manager(
         mgr = db.query(User).filter(User.id == mid).first()
         if not mgr:
             raise HTTPException(status_code=400, detail="Manager user id not found.")
+        if not is_email_in_directory(mgr.email):
+            raise HTTPException(
+                status_code=400,
+                detail="Reporting manager must be one of the configured directory managers.",
+            )
 
     user.manager_id = mid
     db.add(user)
