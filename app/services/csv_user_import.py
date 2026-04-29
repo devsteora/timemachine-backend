@@ -138,7 +138,7 @@ def import_users_from_csv_bytes(
         padding = (list(values) + [""] * len(header))[: len(header)]
         for h, v in zip(header, padding):
             row[h] = (v or "").strip()
-        if not any((row.get("email") or "").strip(), (row.get("password") or "").strip()):
+        if not (row.get("email") or "").strip() and not (row.get("password") or "").strip():
             continue
         data_rows.append((line_i, row))
 
