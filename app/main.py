@@ -45,6 +45,21 @@ def ensure_team_column() -> None:
 
 ensure_team_column()
 
+
+def ensure_name_column() -> None:
+    """Add name to existing DBs created before this column existed."""
+    inspector = inspect(engine)
+    if not inspector.has_table("users"):
+        return
+    cols = [c["name"] for c in inspector.get_columns("users")]
+    if "name" in cols:
+        return
+    with engine.begin() as conn:
+        conn.execute(text("ALTER TABLE users ADD COLUMN name VARCHAR"))
+
+
+ensure_name_column()
+
 app = FastAPI(
     title="Enterprise Time Tracker API",
     description="Backend for the desktop agent and web dashboard",

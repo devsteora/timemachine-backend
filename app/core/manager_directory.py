@@ -16,11 +16,11 @@ class ManagerRecord(TypedDict):
 
 # Five managers — add entries here as the organization grows.
 MANAGER_DIRECTORY: list[ManagerRecord] = [
-    {"name": "Alex Rivera", "email": "alex.rivera@managers.example.com"},
-    {"name": "Jordan Lee", "email": "jordan.lee@managers.example.com"},
-    {"name": "Sam Patel", "email": "sam.patel@managers.example.com"},
-    {"name": "Taylor Morgan", "email": "taylor.morgan@managers.example.com"},
-    {"name": "Casey Nguyen", "email": "casey.nguyen@managers.example.com"},
+    {"name": "Sayan Chatterjee", "email": "sayanc@steorasystems.com"},
+    {"name": "Sanchita Chattopadhyay", "email": "sanchitac@steorasystems.com"},
+    {"name": "Trideb Halder", "email": "tridebhalder@steorasystems.com"},
+    {"name": "Pranay Chhetri", "email": "pchhetri@steorasystems.com"},
+    {"name": "Raj Nandini Saha", "email": "rnsaha@steorasystems.com"},
 ]
 
 

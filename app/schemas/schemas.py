@@ -106,9 +106,23 @@ class MailSendResponse(BaseModel):
 class AdminUserRow(BaseModel):
     id: str
     email: str
+    name: Optional[str] = None
     role: str
     manager_id: Optional[str] = None
     team: Optional[str] = None
+
+
+class CsvUserImportRowError(BaseModel):
+    row_number: int
+    email: Optional[str] = None
+    detail: str
+
+
+class CsvUserImportResult(BaseModel):
+    created: int
+    failed: int
+    errors: List[CsvUserImportRowError] = []
+    manager_warnings: List[CsvUserImportRowError] = []
 
 
 class ManagerAssignment(BaseModel):

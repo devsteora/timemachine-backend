@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date, datetime, timedelta
 from typing import Any, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from sqlalchemy import Date, and_, case, cast, distinct, func
 from sqlalchemy.orm import Session
 
@@ -15,6 +15,7 @@ from app.schemas.schemas import (
     ActivityTimelineResponse,
     AdminUserRow,
     BulkActivityPayload,
+    CsvUserImportResult,
     ManagerAssignment,
     PresenceState,
     TeamAssignment,
@@ -22,6 +23,7 @@ from app.schemas.schemas import (
     TeamPresenceResponse,
     UserActivityStatsItem,
 )
+from app.services.csv_user_import import import_users_from_csv_bytes
 
 router = APIRouter()
 admin_router = APIRouter()
@@ -325,6 +327,32 @@ def get_user_activity_stats_for_admin(
     return out
 
 
+@admin_router.post("/users/import-csv", response_model=CsvUserImportResult)
+async def import_users_csv(
+    file: UploadFile = File(
+        ...,
+        description="UTF-8 CSV with header: email, password, and optional name, role, team, manager_email",
+    ),
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_admin),
+) -> Any:
+    """
+    Bulk-create users as admin. After insert, `manager_email` is resolved to `manager_id`
+    if that manager exists in the database or was created in the same upload.
+
+    See `app.services.csv_user_import` module docstring for column details and TeamCode values.
+    """
+    if file.filename and not file.filename.lower().endswith(".csv"):
+        raise HTTPException(
+            status_code=400,
+            detail="When provided, the filename should end in .csv",
+        )
+    content = await file.read()
+    if not content or not content.strip():
+        raise HTTPException(status_code=400, detail="Empty file")
+    return import_users_from_csv_bytes(db, content)
+
+
 @admin_router.get("/users", response_model=List[AdminUserRow])
 def list_users_for_admin(
     db: Session = Depends(get_db),
@@ -336,6 +364,7 @@ def list_users_for_admin(
         AdminUserRow(
             id=u.id,
             email=u.email,
+            name=u.name,
             role=u.role,
             manager_id=u.manager_id,
             team=u.team,
