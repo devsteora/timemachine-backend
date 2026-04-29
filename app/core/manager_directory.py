@@ -21,6 +21,7 @@ MANAGER_DIRECTORY: list[ManagerRecord] = [
     {"name": "Trideb Halder", "email": "tridebhalder@steorasystems.com"},
     {"name": "Pranay Chhetri", "email": "pchhetri@steorasystems.com"},
     {"name": "Raj Nandini Saha", "email": "rnsaha@steorasystems.com"},
+     {"name": "Debraj Tarafder", "email": "dtarafder@steorasystems.com"},
 ]
 
 
