@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from datetime import date, datetime, timedelta
 from typing import Any, List, Optional
 
@@ -24,6 +25,8 @@ from app.schemas.schemas import (
     UserActivityStatsItem,
 )
 from app.services.csv_user_import import import_users_from_csv_bytes
+
+log = logging.getLogger(__name__)
 
 router = APIRouter()
 admin_router = APIRouter()
@@ -350,7 +353,14 @@ async def import_users_csv(
     content = await file.read()
     if not content or not content.strip():
         raise HTTPException(status_code=400, detail="Empty file")
-    return import_users_from_csv_bytes(db, content)
+    try:
+        return import_users_from_csv_bytes(db, content)
+    except Exception as e:  # noqa: BLE001 — surface DB/validation failures to admin
+        log.exception("CSV import failed")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Import failed: {e!s}",
+        ) from e
 
 
 @admin_router.get("/users", response_model=List[AdminUserRow])

@@ -12,17 +12,22 @@ Admin CSV import for users. Expected columns (header row, case-insensitive):
 
 from __future__ import annotations
 
+import logging
 import csv
 import io
 import uuid
-from typing import Any, Dict, List, Set, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 from pydantic import TypeAdapter, EmailStr
+from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.security import get_password_hash
 from app.models.user import User
 from app.schemas.schemas import CsvUserImportResult, CsvUserImportRowError, TeamCode
+
+log = logging.getLogger(__name__)
 
 BCRYPT_MAX_PASSWORD_BYTES = 72
 _ROLES: Set[str] = {"ADMIN", "MANAGER", "EMPLOYEE"}
@@ -173,13 +178,20 @@ def import_users_from_csv_bytes(
             )
             continue
         assert data is not None
+        data["email"] = str(data["email"]).strip().lower()
+        if data.get("manager_email"):
+            data["manager_email"] = str(data["manager_email"]).strip().lower()
         to_create.append((line_i, data))
 
     created = 0
     pending_managers: List[Tuple[int, str, str]] = []  # line, user_email, manager_email
 
     for line_i, data in to_create:
-        existing = db.query(User).filter(User.email == data["email"]).first()
+        existing = (
+            db.query(User)
+            .filter(func.lower(User.email) == data["email"])
+            .first()
+        )
         if existing:
             errors.append(
                 CsvUserImportRowError(
@@ -207,13 +219,29 @@ def import_users_from_csv_bytes(
                 (line_i, data["email"], data["manager_email"])
             )
 
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        log.warning("CSV import user insert failed: %s", exc)
+        detail = str(exc.orig) if getattr(exc, "orig", None) else str(exc)
+        return CsvUserImportResult(
+            created=0,
+            failed=len(to_create),
+            errors=[
+                CsvUserImportRowError(
+                    row_number=0,
+                    detail=f"Database rejected the batch (usually duplicate email): {detail}",
+                )
+            ],
+            manager_warnings=[],
+        )
 
     for line_i, user_email, manager_email in pending_managers:
-        user = db.query(User).filter(User.email == user_email).first()
+        user = db.query(User).filter(func.lower(User.email) == user_email).first()
         if not user:
             continue
-        mgr = db.query(User).filter(User.email == manager_email).first()
+        mgr = db.query(User).filter(func.lower(User.email) == manager_email).first()
         if not mgr:
             manager_warnings.append(
                 CsvUserImportRowError(
@@ -235,7 +263,19 @@ def import_users_from_csv_bytes(
         user.manager_id = mgr.id
         db.add(user)
     if pending_managers:
-        db.commit()
+        try:
+            db.commit()
+        except IntegrityError as exc:
+            db.rollback()
+            log.warning("CSV import manager link failed: %s", exc)
+            detail = str(exc.orig) if getattr(exc, "orig", None) else str(exc)
+            manager_warnings.append(
+                CsvUserImportRowError(
+                    row_number=0,
+                    email=None,
+                    detail=f"Could not save manager links: {detail}",
+                )
+            )
 
     return CsvUserImportResult(
         created=created,

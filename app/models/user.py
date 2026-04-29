@@ -1,8 +1,9 @@
-from sqlalchemy import Column, String, Enum, ForeignKey
+from enum import Enum as PyEnum
+from sqlalchemy import Column, String, ForeignKey
 from app.models.base import Base
 import uuid
 
-class RoleEnum(str, Enum):
+class RoleEnum(str, PyEnum):
     ADMIN = "ADMIN"
     MANAGER = "MANAGER"
     EMPLOYEE = "EMPLOYEE"
