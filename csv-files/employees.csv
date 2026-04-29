@@ -1,4 +1,4 @@
-email,password,name,role,team,manager_email
+email,password,name,role,team,manager_id
 dtarafder@steorasystems.com,dtarafder2026,Debraj Tarafder,ADMIN,ADMIN,dtarafder@steorasystems.com
 sdas@steorasystems.com,sdas2026,Samoyeta Das,EMPLOYEE,TRANSCRIPTION,tridebhalder@steorasystems.com
 dmajumder@steorasystems.com,dmajumder2026,Debjyoti Majumder,ADMIN,HR,thalder@steorasystems.com

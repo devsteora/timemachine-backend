@@ -1,4 +1,4 @@
-email,password,name,role,team,manager_email
+email,password,name,role,team,manager_id
 sayanc@steorasystems.com,sayan2026,Sayan Chatterjee,MANAGER,DEV,dtarafder@steorasystems.com
 sanchitac@steorasystems.com,sanchita2026,Sanchita Chattopadhyay,MANAGER,AV,dtarafder@steorasystems.com
 rnsaha@steorasystems.com,rnsaha2026,Raj Nandini Saha,MANAGER,QC,dtarafder@steorasystems.com
