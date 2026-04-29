@@ -316,6 +316,7 @@ def get_user_activity_stats_for_admin(
             UserActivityStatsItem(
                 id=u.id,
                 email=u.email,
+                name=u.name,
                 role=u.role,
                 days_worked_this_week=days_in,
                 total_activity_score=round(score, 2),

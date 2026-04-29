@@ -20,11 +20,13 @@ class UserCreate(BaseModel):
     email: EmailStr
     password: str
     role: str = "EMPLOYEE"
+    name: Optional[str] = Field(None, max_length=200)
 
 class UserResponse(BaseModel):
     id: str
     email: EmailStr
     role: str
+    name: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -66,6 +68,7 @@ class ActivityTimelineResponse(BaseModel):
 class UserActivityStatsItem(BaseModel):
     id: str
     email: str
+    name: Optional[str] = None
     role: str
     days_worked_this_week: int
     total_activity_score: float
