@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import uuid
 from datetime import date, datetime, timedelta
 from typing import Any, List, Optional
 
@@ -14,6 +15,7 @@ from app.models.user import User
 from app.core.manager_directory import MANAGER_DIRECTORY, is_email_in_directory
 from app.schemas.schemas import (
     ActivityTimelineItem,
+    ActivityTimelineSegment,
     ActivityTimelineResponse,
     AdminUserRow,
     BulkActivityPayload,
@@ -34,6 +36,90 @@ router = APIRouter()
 admin_router = APIRouter()
 
 PRESENCE_FRESH_MINUTES = 15
+
+ONGOING_LAST_SEGMENT_RECENCY = timedelta(minutes=2)
+
+
+def _normalize_naive_utc(ts: datetime) -> datetime:
+    if ts.tzinfo is not None:
+        return ts.replace(tzinfo=None)
+    return ts
+
+
+def _segment_merge_key(row: ActivityLog) -> str:
+    app = (row.active_app or "").strip().lower()
+    if app == "break":
+        return "break"
+    if row.status == "IDLE":
+        return "idle"
+    return "working"
+
+
+def _activity_label_for_key(key: str) -> str:
+    if key == "working":
+        return "Working"
+    if key == "break":
+        return "Idle — Break"
+    return "Idle — No input"
+
+
+def _segments_from_minute_logs(
+    rows: list[ActivityLog],
+    target_day: date,
+    now_utc: datetime,
+) -> list[ActivityTimelineSegment]:
+    """Merge consecutive minute rows into spans; return newest-first."""
+    if not rows:
+        return []
+
+    chunks: list[tuple[str, datetime, datetime]] = []
+    cur_key: str | None = None
+    chunk_start: datetime | None = None
+    chunk_last_ts: datetime | None = None
+
+    for row in rows:
+        ts = _normalize_naive_utc(row.timestamp)
+        key = _segment_merge_key(row)
+        if cur_key is None:
+            cur_key = key
+            chunk_start = ts
+            chunk_last_ts = ts
+        elif key == cur_key:
+            chunk_last_ts = ts
+        else:
+            assert chunk_start is not None and chunk_last_ts is not None
+            chunks.append((cur_key, chunk_start, chunk_last_ts))
+            cur_key = key
+            chunk_start = ts
+            chunk_last_ts = ts
+
+    assert cur_key is not None and chunk_start is not None and chunk_last_ts is not None
+    chunks.append((cur_key, chunk_start, chunk_last_ts))
+
+    utc_today = now_utc.date()
+    out_chrono: list[ActivityTimelineSegment] = []
+
+    for i, (key, start_at, _last_ts) in enumerate(chunks):
+        if i + 1 < len(chunks):
+            end_at: datetime | None = chunks[i + 1][1]
+        elif target_day == utc_today and (
+            now_utc - _last_ts <= ONGOING_LAST_SEGMENT_RECENCY
+        ):
+            end_at = None
+        else:
+            end_at = _last_ts + timedelta(minutes=1)
+
+        out_chrono.append(
+            ActivityTimelineSegment(
+                id=str(uuid.uuid4()),
+                start_at=start_at,
+                end_at=end_at,
+                activity=_activity_label_for_key(key),
+                note=None,
+            )
+        )
+
+    return list(reversed(out_chrono))
 
 
 def _week_bounds_utc(now: datetime | None = None) -> tuple[datetime, datetime]:
@@ -222,8 +308,12 @@ def get_my_activity_timeline(
     n = len(rows)
     avg = round(score_sum / n, 2) if n else 0.0
 
+    now_utc = datetime.utcnow()
+    segments = _segments_from_minute_logs(rows, target, now_utc)
+
     return ActivityTimelineResponse(
         logs=logs,
+        segments=segments,
         active_minutes=active_m,
         idle_minutes=idle_m,
         flagged_minutes=flagged_m,

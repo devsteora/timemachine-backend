@@ -56,8 +56,17 @@ class ActivityTimelineItem(BaseModel):
     score: float
 
 
+class ActivityTimelineSegment(BaseModel):
+    id: str
+    start_at: datetime
+    end_at: Optional[datetime] = None
+    activity: str
+    note: Optional[str] = None
+
+
 class ActivityTimelineResponse(BaseModel):
     logs: List[ActivityTimelineItem]
+    segments: List[ActivityTimelineSegment] = Field(default_factory=list)
     active_minutes: int
     idle_minutes: int
     flagged_minutes: int
